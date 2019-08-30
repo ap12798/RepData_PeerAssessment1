@@ -1,0 +1,149 @@
+---
+title: "Project 1"
+author: "Andrew J Porter"
+date: "August 27, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Project 1 Fitness Tracker Analytics
+
+This is an R Markdown document that will be used to explain some simple EDA regarding a Fitness Tracker
+
+
+```{r message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(plyr)
+library(lattice)
+```
+
+Loading the data:
+
+```{r}
+df <- read.csv("activity.csv")
+df$day <- weekdays(as.Date(df$date))
+df$DateTime<- as.POSIXct(df$date, format="%Y-%m-%d")
+head(df)
+```
+
+##What is the mean total number of steps taken per day?
+
+```{r}
+sum <- aggregate(df$steps ~ df$date, FUN="sum", )
+colnames(sum)<- c("Date", "Steps")
+
+hist(sum$Steps, breaks=10, xlab="Steps", main = "Total Steps per Day", col = "lightblue")
+```
+
+Interesting to see what is going on with the couple of days to the far right, seems like an outlier. I wonder what days those occurred on?
+Below is the sorted sum showing the dates of the top most walking days. 
+
+```{r}
+head(sum[order(-sum$Steps),])
+```
+
+Looks like the top most days were prior to Thanksgiving?! Maybe in anticipation of a large meal
+
+**Calculate and report the mean and median of the total number of steps taken per day**
+
+```{r}
+mean_missing <- as.integer(mean(sum$Steps))
+median_missing <- as.integer(median(sum$Steps))
+```
+
+The mean steps is `r mean_missing`.
+The median steps is `r median_missing`
+
+## What is the average daily activity pattern?
+
+```{r}
+ts <- tapply(df$steps, df$interval, mean, na.rm = T)
+plot(as.numeric(names(ts)),
+     ts,
+     xlab = "Interval",
+     ylab = "Steps",
+     main = "Time series of daily steps",
+     type = "l")
+```
+
+Looks like slow start to the day, a peak just before mid day and then more consisten activity throughout th afternoon.
+
+
+```{r}
+five_min <- (sort(ts, decreasing = T))
+index_five_min <- names(five_min[1])
+```
+
+The five minute interval at the peak is `r index_five_min`.
+
+## Imputing missing values
+```{r}
+no_missing <- nrow(df[is.na(df$steps),])
+```
+The number of missing values is `r no_missing`.
+Making a df2 dataframe with another column called either weekend or weekday and taking the average amount of steps for that particular day and replacing the associated NAs with the mean.
+```{r}
+df2 <- split(df, df$interval)
+
+df2 <- lapply(df2, function(x) {
+  x$steps[which(is.na(x$steps))] <- mean(x$steps, na.rm = TRUE)
+  return(x)
+})
+df2 <- do.call("rbind", df2)
+row.names(df2) <- NULL
+
+df2 <- split(df2, df2$date)
+df3 <- lapply(df2, function(x) {
+  x$steps[which(is.na(x$steps))] <- mean(x$steps, na.rm = TRUE)
+  return(x)
+})
+df2 <- do.call("rbind", df2)
+row.names(df2) <- NULL
+
+sum_impute <- aggregate(df2$steps ~ df2$date, FUN="sum", )
+colnames(sum_impute)<- c("Date", "Steps")
+
+```
+
+
+```{r}
+hist(sum_impute$Steps, breaks=10, xlab="Steps", main = "Total Steps per Day", col = "lightblue")
+```
+
+Looks similar to the histogram that contains NAs, nothing crazy different.
+
+```{r}
+mean_impute <- as.integer(mean(sum_impute$Steps))
+median_impute <- as.integer(median(sum_impute$Steps))
+```
+
+The mean total number of steps is `r mean_impute` and the median total number of steps is `r median_impute`
+Mean and Median stayed around the same value also.
+
+##Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+df2$Weekday_Weekend <- ifelse(df2$day %in% c("Saturday", "Sunday"), "Weekend", "Weekday")
+
+df4 <- aggregate(steps~interval + Weekday_Weekend, df2, mean, na.rm = TRUE)
+
+p <- ggplot(df4, aes(x = interval , y = steps, color = Weekday_Weekend)) +
+  geom_line() +
+  labs(title = "Average daily steps", x = 'Interval', y = 'Average steps') +
+  theme(legend.position = "none") + 
+  facet_wrap(~Weekday_Weekend, ncol = 2, nrow=1)
+p
+
+```
+
+Seems like the weekend there is more focus to get the "steps in". Although the peak average number of steps happened on the weekend. My theory of being close to the holiday stands!
+
+
+
+
+
+
